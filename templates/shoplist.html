@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+
+<html lang="zh-cn">
+<head>
+	<title>店铺列表</title>
+	<link rel="stylesheet" type="text/css" href="/static/base.css">
+	<link rel="stylesheet" type="text/css" href="/static/shop.css">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+	<div class="mobile_page">
+		<div class="topBar">
+			<div></div>
+			<div class="title">店铺列表({{shoplist|length}})</div>
+			<div></div>
+		</div>
+		<div class="scrollview">
+		{% for shop in shoplist %}
+			<div class="shopitem" onclick="window.location.href='/shop/{{shop.shop_id}}'">
+				<div class="row">
+					<div class="shopname">{{shop.shop_name}}</div>
+					{% if shop.status == normal_status %}
+						<div class="greenbox_text">正常营业</div>
+					{% elif shop.status == reserve_status %}
+						<div class="yellowbox_text">暂停营业</div>
+					{% endif %}
+				</div>
+				<div class="shop_pos">{{shop.shop_position}}</div>
+			</div>
+		{% endfor %}
+		</div>
+	</div>
+</body>
+</html>

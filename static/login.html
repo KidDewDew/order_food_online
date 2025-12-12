@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+
+<html lang="zh-cn">
+<head>
+	<title>请登录</title>
+	<link rel="stylesheet" type="text/css" href="/static/base.css">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+	
+	<form id="form1" class="login_box" method="POST" action="#"> <!登录框>
+		<div class="grid_2col_title"> 
+			●○●○ 请登录点餐系统 ●○●○
+		</div>
+		<label>用户名：</label>
+		<input name="username" required>
+		<label>密码： </label>
+		<input name="password" type="password" required>
+		<label>验证码：</label>
+		<div style='display:flex;align-items:center;gap:0.5rem'>
+			<input name="verify_code" style='width:4rem' required>
+			<img id='img_verify_code' style='width:70px; height:25px' 
+				src="/api/get_verify_code"
+				onclick="update_verify_code();"/>
+		</div>
+		<button type="button" class="link_button" type="button" 
+			onclick="switchToRegister()">
+			注册
+		</button>
+		<button type="button" onclick="login();">
+			登录
+		</button>
+	</form>
+	
+	<form id="form2" class="login_box" style='display:none;'
+			method="POST" action="#"> <!登录框>
+		<div class="grid_2col_title"> 
+			●○●○ 用户注册 ●○●○
+		</div>
+		<label>用户名：</label>
+		<input name="username" required>
+		<label>密码： </label>
+		<input name="password" type="password" required>
+		<label>类型：</label>
+		<div style='display:flex;align-items:center;gap:0.5rem'>
+			<input type="radio" name="userType" value="customer">顾客</radio>
+			<input type="radio" name="userType" value="shopper">商家</radio>
+		</div>
+		<label>验证码：</label>
+		<div style='display:flex;align-items:center;gap:0.5rem'>
+			<input name="verify_code" style='width:4rem' required>
+			<img id='img_verify_code_2' style='width:70px; height:25px' 
+				src="/api/get_verify_code"
+				onclick="update_verify_code();"/>
+		</div>
+		<button class="link_button" type="button" 
+			onclick="switchToLogin()">
+			登录
+		</button>
+		<button type="button" onclick="register();">注册</button>
+	</form>
+	
+	<script>
+		function update_verify_code() {
+			if(document.getElementById('form1').style.display == 'grid')
+				document.getElementById('img_verify_code').src =
+					`/api/get_verify_code?timestamp=${Date.now()}`;
+			else
+				document.getElementById('img_verify_code_2').src =
+					`/api/get_verify_code?timestamp=${Date.now()}`;
+		}
+		
+		function switchToRegister() {
+			document.getElementById('form1').style.display = 'none'
+			document.getElementById('form2').style.display = 'grid'
+		}
+		
+		function switchToLogin() {
+			document.getElementById('form1').style.display = 'grid'
+			document.getElementById('form2').style.display = 'none'
+		}
+		
+		function register() {
+			const form = new FormData(document.getElementById('form2'))
+			let xhr = new XMLHttpRequest()
+			xhr.open("POST","/api/register",true)
+			xhr.onreadystatechange = function() {
+				if (xhr.readyState === XMLHttpRequest.DONE) {
+					const response = JSON.parse(xhr.responseText);
+					if (xhr.status == 200) {
+						alert(response['msg']);
+						switchToLogin();
+					} else {
+						alert('注册失败：' + response['errorMsg']);
+						update_verify_code() //刷新验证码（服务器上验证码已失效)
+					}
+				}
+			};
+			xhr.send(form);
+			return false
+		}
+		
+		function login() {
+			const form = new FormData(document.getElementById('form1'))
+			let xhr = new XMLHttpRequest()
+			xhr.open("POST","/api/login",true)
+			xhr.onreadystatechange = function() {
+				if (xhr.readyState === XMLHttpRequest.DONE) {
+					const response = JSON.parse(xhr.responseText);
+					if (xhr.status == 200) {
+						window.location.href = "/" //跳转到主页
+					} else {
+						alert('登录失败：' + response['errorMsg']);
+						update_verify_code() //刷新验证码（服务器上验证码已失效)
+					}
+				}
+			};
+			xhr.send(form);
+			return false
+		}
+	</script>
+	
+</body>
+</html>
