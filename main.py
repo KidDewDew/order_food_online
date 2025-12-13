@@ -10,6 +10,7 @@ import pay
 
 app = Flask(__name__)
 
+
 @app.route("/")
 def index():
     if not shared.check_logined_and_role():

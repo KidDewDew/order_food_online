@@ -34,22 +34,36 @@ def shoplist_page():
                            shoplist=shoplist)
 
 def shop_page(shop_id):
+    # 需要判断一下这个店是不是属于这个用户
     cursor = db.get_cursor()
+    cursor.execute("SELECT username FROM user_shop WHERE shop_id=%s", (shop_id,))
+    r = cursor.fetchall()
+    if len(r) == 0:
+        return "<h1>这家店铺不存在哦</h1>",404
+    shop_username = r[0][0]
+    if shop_username == session.get("username",None):
+        isShopper = True
+    else: isShopper = False
     cursor.execute("SELECT shop_name,shop_position FROM shop WHERE shop_id=%s",(shop_id,))
     r = cursor.fetchall()
     cursor.close()
     if len(r) == 0:
         return "<h1>这家店铺不存在哦</h1>",404
-    return render_template("shop.html",shop_name=r[0][0],shop_position=r[0][1])
+    return render_template("shop.html",
+                           shop_name=r[0][0],
+                           shop_id=shop_id,
+                           shop_position=r[0][1],
+                           isShopper=isShopper)
 
 # 获取店铺最新的items列表
 def get_shop_items(shop_id):
     try:
         cursor = db.get_cursor(dictionary=True)
-        cursor.execute("SELECT item_id,rest_num,price,item_name FROM shop_items INNER JOIN item "
+        cursor.execute("SELECT item.item_id,rest_num,price,item_name FROM shop_items INNER JOIN item "
                        "ON shop_items.item_id = item.item_id WHERE shop_id = %s",(shop_id,))
         return jsonify(cursor.fetchall()),200
     except mysql.connector.errors.Error as e:
+        print(e)
         return jsonify({"errorMsg":""}),400
     finally:
         cursor.close()

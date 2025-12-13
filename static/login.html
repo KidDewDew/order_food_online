@@ -62,7 +62,7 @@
 	
 	<script>
 		function update_verify_code() {
-			if(document.getElementById('form1').style.display == 'grid')
+			if(document.getElementById('form2').style.display == 'none')
 				document.getElementById('img_verify_code').src =
 					`/api/get_verify_code?timestamp=${Date.now()}`;
 			else

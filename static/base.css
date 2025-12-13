@@ -67,6 +67,19 @@ button:active {
 	background: white;
 }
 
+.img_button {
+	width: 19pt;
+	height: 19pt;
+}
+.img_button_big {
+	width: 32pt;
+	height: 32pt;
+}
+
+.img_button:active {
+	transform: scale(0.9);
+}
+
 .login_box {
 	display: grid;
 	position: fixed;
@@ -130,6 +143,12 @@ button:active {
 .row {
 	display: flex;
 	gap: 0.8rem;
+	align-items: center;
+}
+.column {
+	display: flex;
+	flex-direction:column;
+	gap: 0.4rem;
 	align-items: center;
 }
 .splitLine {
@@ -208,6 +227,9 @@ button:active {
 }
 
 .topBar > .title {
+	display: flex;
+	align-items: end;
+	gap: 5pt;
 	font-size: 1.2rem;
 }
 
@@ -266,4 +288,9 @@ button:active {
 	box-shadow: none;
 	cursor: pointer;
 	transform: scale(0.9);
+}
+
+.tip_text {
+	color: #707070;
+	font-size: 0.85rem;
 }

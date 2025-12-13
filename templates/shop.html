@@ -11,18 +11,18 @@
 	<div class="mobile_page">
 		<div class="topBar">
 			<div></div>
-			<div class="title">{{shop_name}}</div>
-			<div></div>
-		</div>
-		<div class="scrollview">
-			<div class="item">
-				<img class="item_image" src="">
-				<div class="item_right">
-					<div class="item_name">羊肉串1串</div>
-					<div class="item_rest_num">剩余200份</div>
-					<div class="item_price">￥5.88</div>
-				</div>
+			<div class="title">
+				{% if isShopper %}
+				<div>店名:</div>
+				{% endif %}
+				{{shop_name}}
+				{% if isShopper %}
+				<img src="/static/image/icon_write.png" class="img_button" onclick="">
+				{% endif %}
 			</div>
+			<div id="statusText" class="tip_text"></div>
+		</div>
+		<div id="item_area" class="scrollview">
 			<div class="item">
 				<img class="item_image" src="">
 				<div class="item_right">
@@ -44,8 +44,93 @@
 		</div>
 		<div class="bottomBar">
 			<button class="link_button">我的订单</button>
+			{%if isShopper %}
+			<button class="accent_button">创建餐品</button>
+			<button class="accent_button">店铺设置</button>
+			{%else%}
 			<button class="accent_button">我选好了</button>
+			{%endif%}
 		</div>
 	</div>
 </body>
+<script>
+
+	var itemarea = document.getElementById("item_area")
+	var statusText = document.getElementById("statusText")
+	var itemid_element = {} //记录item_id到item元素的映射
+	{%if not isShopper %}
+	var item_selected_num = {} //记录当前用户购物车: item_id->num
+	{%endif%}
+
+	// 根据item json数据更新item_element元素
+	function updateItem(item_element,item) {
+		item_element.innerHTML = 
+		`
+			<img class="item_image" src="\api\get_item_cover\${item.item_id}">
+			<div class="item_right">
+				<div class="item_name">${item.item_name}</div>
+				<div class="item_rest_num">剩余${item.rest_num}份</div>
+				<div class="item_price">￥${item.price}</div>
+			</div>
+			<div style="flex-grow:1"></div>
+			<div class="row">
+				<div class="round_button">+</div>
+					
+				<div style="display:flex;gap:2pt;align-items:end;">
+					{%if isShopper %}
+					<div>剩余${item.rest_num}</div>
+					{%else%}
+					<div>${item_selected_num[item.item_id]}</div>
+					{%endif%}
+					<div style="font-size:0.7rem;color:grey">份</div>
+				</div>
+				<div class="round_button">-</div>
+				{%if isShopper %}
+				<div class="column">
+					<div class="link_button">修改剩余数量</div>
+					<div class="link_button">删除</div>
+					<div class="link_button">修改图片</div>
+				</div>
+				{%endif%}
+			</div>
+		`
+	}
+
+	// 更新一次商品列表
+	function updateItems() {
+		statusText.innerHTML = "正在更新列表..."
+		const xhr = new XMLHttpRequest();
+		xhr.open("GET","/shop/{{shop_id}}/get_items",true)
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState === XMLHttpRequest.DONE) {
+				const json = JSON.parse(xhr.responseText);
+				if (xhr.status == 200) {
+					statusText.innerHTML = ""
+					console.log("get_items: ",json);
+					for(const item of json) {
+						if(itemid_element.has(item.item_id)) {
+							//列表中已经存在
+							updateItem(itemid_element[item.item_id],item);
+						} else {
+							//需要添加到末尾
+							item_element = document.createElement("div")
+							item_element.class = "item"
+							itemarea.appendChild(item_element)
+							updateItem(item_element,item)
+							//记录
+							itemid_element[item.item_id] = item_element
+						}
+					}
+				} else {
+					statusText.innerHTML = "获取列表失败"
+				}
+			}
+		};
+		xhr.send();	
+	}
+	setInterval(updateItems,6000) // 6秒更新一次当前餐品
+	
+	updateItems() //立即获取商品列表
+</script>
+
 </html>
