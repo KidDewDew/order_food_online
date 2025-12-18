@@ -108,7 +108,7 @@
 				if (xhr.readyState === XMLHttpRequest.DONE) {
 					const response = JSON.parse(xhr.responseText);
 					if (xhr.status == 200) {
-						window.location.href = "/" //跳转到主页
+						window.location.href = response['redirect'] //跳转到goto_url
 					} else {
 						alert('登录失败：' + response['errorMsg']);
 						update_verify_code() //刷新验证码（服务器上验证码已失效)

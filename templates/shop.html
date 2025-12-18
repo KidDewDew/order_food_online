@@ -23,40 +23,47 @@
 			<div id="statusText" class="tip_text"></div>
 		</div>
 		<div id="item_area" class="scrollview">
-			<div class="item">
-				<img class="item_image" src="">
-				<div class="item_right">
-					<div class="item_name">烤蘑菇1串</div>
-					<div class="item_rest_num">剩余200份</div>
-					<div class="item_price">￥1.88</div>
-				</div>
-				<div style="flex-grow:1"></div>
-				<div class="row">
-					<div class="round_button">+</div>
-					
-					<div style="display:flex;gap:2pt;align-items:end;">
-						<div>0</div>
-						<div style="font-size:0.7rem;color:grey">份</div>
-					</div>
-					<div class="round_button">-</div>
-				</div>
-			</div>
+			
 		</div>
 		<div class="bottomBar">
-			<button class="link_button">我的订单</button>
 			{%if isShopper %}
-			<button class="accent_button">创建餐品</button>
+			<button class="link_button">订单列表</button>
+			<button class="accent_button" onclick="addItem()">创建餐品</button>
 			<button class="accent_button">店铺设置</button>
 			{%else%}
+			<button class="link_button">我的订单</button>
 			<button class="accent_button">我选好了</button>
 			{%endif%}
 		</div>
 	</div>
+	
+	<dialog id="dialog_createItem">
+		<form id="form_createItem" class="login_box">
+			<div class="grid_2col_title"> 
+				●○●○ 创建新餐品 ●○●○
+			</div>
+			<label>餐品名称</label>
+			<input name="item_name" placeholder="输入餐品的名称" required>
+			<label>餐品图片</label>
+			<img style="width:100;height:100">
+			<label>价格</label>
+			<input name="price" placeholder="输入价格，如：5.0、3.5" required>
+			<button type="button" onclick="dialog_createItem.close()">取消</button>
+			<button type="button" 
+				onclick="dialog_createItem.close();submit_createItem()">确认提交</button>
+		</form>
+	</dialog>
+	
+	
 </body>
+
 <script>
 
 	var itemarea = document.getElementById("item_area")
 	var statusText = document.getElementById("statusText")
+	
+	var dialog_createItem = document.getElementById("dialog_createItem")
+	
 	var itemid_element = {} //记录item_id到item元素的映射
 	{%if not isShopper %}
 	var item_selected_num = {} //记录当前用户购物车: item_id->num
@@ -70,7 +77,15 @@
 			<div class="item_right">
 				<div class="item_name">${item.item_name}</div>
 				<div class="item_rest_num">剩余${item.rest_num}份</div>
+				{%if isShopper %}
+				<div class="row">
+					<div>修改价格：￥</div>
+					<input/>
+					<button type="button">提交新价格</button>
+				</div>
+				{%else%}
 				<div class="item_price">￥${item.price}</div>
+				{%endif%}
 			</div>
 			<div style="flex-grow:1"></div>
 			<div class="row">
@@ -128,6 +143,11 @@
 		};
 		xhr.send();	
 	}
+	
+	function addItem() {
+		dialog_createItem.showModal();
+	}
+	
 	setInterval(updateItems,6000) // 6秒更新一次当前餐品
 	
 	updateItems() //立即获取商品列表

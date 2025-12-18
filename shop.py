@@ -99,7 +99,7 @@ def add_shop_item(shop_id):
         for image in images:
             _,suffix = os.path.splitext(image.filename)
             image_url = "/static/image/item_image/"+shared.generate_random_id() + suffix
-            # 这里直接假设不会出现名称冲突(因为概率非常小，而且即使发生影响也不是很大)
+            # 这里直接假设不会出现名称冲突(因为概率极小，而且即使发生影响也不是很大)
             image.save(image_url)
         conn.commit()
     except mysql.connector.errors.Error as e:
