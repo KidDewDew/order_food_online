@@ -34,7 +34,7 @@ def generate_random_codes(length,choices):
 
 # 生成一个几乎不会重复的随机id
 def generate_random_id():
-    return datetime.now().strftime("%Y%m%d%H%M%S") + generate_random_codes(6,"0123456789")
+    return datetime.datetime.now().strftime("%Y%m%d%H%M%S") + generate_random_codes(6,"0123456789")
 
 # 检查登录状态和登录角色
 def check_logined_and_role(role="anyRole"):

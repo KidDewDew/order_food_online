@@ -1,42 +1,34 @@
 import threading
 import mysql.connector
+from mysql.connector import pooling
+from numpy.lib.function_base import place
 
 # 数据库连接(mysql.connection)
 db_connection = []
 
 lock = threading.Lock()
 
-def create_db_connection():
-    conn = mysql.connector.connect(
-        host="47.120.51.172",  ### 部署到mysql所在服务器后，注意修改为localhost。
-        user="user0",
-        password="Taxue_#601",
-        database="ordersys_db"
-    )
-    conn.is_connected()
-    return conn
+connection_pool = pooling.MySQLConnectionPool(
+    pool_name="mypool",
+    pool_size=10,
+    host="47.120.51.172",  ### 部署到mysql所在服务器后，注意修改为localhost。
+    user="user0",
+    password="Taxue_#601",
+    database="ordersys_db"
+)
 
 def get_db_connection():
-    tid = threading.get_ident()
+    return connection_pool.get_connection()
 
-    for pair in db_connection:
-        if pair[0] == tid:
-            if not pair[1].is_connected():
-                pair[1] = create_db_connection()
-            return pair[1]
-
-    lock.acquire_lock()
-
-    conn = create_db_connection()
-    if not conn:
-        lock.release_lock()
+# 注：do_query确保对conn、cursor的close，并且能处理异常；如果发生异常返回None
+def do_query(sql,placeholders):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(sql,placeholders)
+        return cursor.fetchall()
+    except Exception as e:
         return None
-    db_connection.append((tid,conn))
-
-    lock.release_lock()
-
-    return conn
-
-def get_cursor(dictionary=False):
-    conn = get_db_connection()
-    return conn.cursor(dictionary=dictionary)
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()

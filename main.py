@@ -1,6 +1,7 @@
 import os
 
 import auth
+import db
 import shared
 from flask import (Flask, request, render_template, make_response,
                    redirect, url_for, jsonify, session)
@@ -39,5 +40,3 @@ if __name__ == "__main__":
     app.run(host="0.0.0.0")
 
     # 关闭与数据库的所有连接
-    for conn in shared.db_connection:
-        conn.close()

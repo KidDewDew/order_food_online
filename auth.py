@@ -21,12 +21,10 @@ def api_login():
     verify_code = request.form.get('verify_code')
     if verify_code != session.pop('verify_code',None):
         return jsonify({"errorMsg":"验证码错误"}),400
-    cursor = db.get_cursor()
-    cursor.execute("SELECT password_md5,user_type,user_status FROM user WHERE username=%s",(username,))
-    r = cursor.fetchall()
-    cursor.close()
 
-    if len(r) == 0 or r[0][2] == shared.UserStatus_Dead:
+    r = db.do_query("SELECT password_md5,user_type,user_status FROM user WHERE username=%s",(username,))
+
+    if not r or len(r) == 0 or r[0][2] == shared.UserStatus_Dead:
         return jsonify({"errorMsg":"该用户不存在"}),400
 
     if hashlib.md5(password.encode()).hexdigest().lower() != r[0][0].lower():
@@ -38,16 +36,16 @@ def api_login():
     # 记录登录的状态
     session["logined"] = True
     session["username"] = username
-    session["role"] = r[0][1]
+    session["role"] = "customer" if r[0][1] == shared.UserType_Customer else "shopper"
 
     if r[0][1] == shared.UserType_Customer:
         goto_url = "/shoplist"
     else:
         #对于shopper用户，需要查询该用户的店铺id
-        cursor = db.get_cursor()
-        cursor.execute("SELECT shop_id FROM user_shop WHERE username=%s",(username,))
-        shop_id = cursor.fetchall()[0][0]
-        cursor.close()
+        r = db.do_query("SELECT shop_id FROM user_shop WHERE username=%s",(username,))
+        if not r or len(r) == 0:
+            return jsonify({"errorMsg": "账号异常，请联系.."}), 400
+        shop_id = r[0][0]
         goto_url = f"/shop/{shop_id}"
 
     return jsonify({"redirect":goto_url}),200

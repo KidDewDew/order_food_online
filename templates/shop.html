@@ -45,7 +45,9 @@
 			<label>餐品名称</label>
 			<input name="item_name" placeholder="输入餐品的名称" required>
 			<label>餐品图片</label>
-			<img style="width:100;height:100">
+			<input id="input_image" type="file" id="file" name="images" accept="image/*">
+			<div></div>
+			<img id="item_image" style="width:4.5rem;height:4.5rem">
 			<label>价格</label>
 			<input name="price" placeholder="输入价格，如：5.0、3.5" required>
 			<button type="button" onclick="dialog_createItem.close()">取消</button>
@@ -61,8 +63,19 @@
 
 	var itemarea = document.getElementById("item_area")
 	var statusText = document.getElementById("statusText")
-	
 	var dialog_createItem = document.getElementById("dialog_createItem")
+	var input_image = document.getElementById("input_image");
+	
+	input_image.addEventListener('change',changePreviewImage);
+	
+	function changePreviewImage(e) {
+		const files = e.target.files;
+		const img = document.getElementById("item_image");
+		if(files.length == 0) img.src = "";
+		else {
+			img.src = URL.createObjectURL(files[0]);
+		}
+	}
 	
 	var itemid_element = {} //记录item_id到item元素的映射
 	{%if not isShopper %}
@@ -71,29 +84,39 @@
 
 	// 根据item json数据更新item_element元素
 	function updateItem(item_element,item) {
+		if(item_element.children.length == 0) { //第一次创建该item_element
 		item_element.innerHTML = 
 		`
-			<img class="item_image" src="\api\get_item_cover\${item.item_id}">
+			<img class="item_image" src="/api/get_item_cover/${item.item_id}">
+			{%if not isShopper %}
 			<div class="item_right">
-				<div class="item_name">${item.item_name}</div>
-				<div class="item_rest_num">剩余${item.rest_num}份</div>
+			{% else %}
+			<div class="item_right" style="height:5rem">
+			{% endif %}
+				<div id="${item.item_id}_item_name" class="item_name">${item.item_name}</div>
+				<div id="${item.item_id}_rest_num" class="item_rest_num">剩余${item.rest_num}份</div>
 				{%if isShopper %}
 				<div class="row">
-					<div>修改价格：￥</div>
-					<input/>
-					<button type="button">提交新价格</button>
+					<div style="font-size:0.7rem;">修改价格：￥</div>
+					<input style="width:3rem;">
+					<button type="button" style="font-size:0.7rem;width:4rem;">提交</button>
 				</div>
 				{%else%}
 				<div class="item_price">￥${item.price}</div>
 				{%endif%}
 			</div>
+			{%if not isShopper %}
 			<div style="flex-grow:1"></div>
+			{% endif %}
 			<div class="row">
 				<div class="round_button">+</div>
 					
 				<div style="display:flex;gap:2pt;align-items:end;">
 					{%if isShopper %}
-					<div>剩余${item.rest_num}</div>
+					<div>
+						<span style='font-size:0.7rem'>剩余</span>
+						<div id="${item.item_id}_rest_num_2">${item.rest_num}</div>
+					</div>
 					{%else%}
 					<div>${item_selected_num[item.item_id]}</div>
 					{%endif%}
@@ -101,14 +124,26 @@
 				</div>
 				<div class="round_button">-</div>
 				{%if isShopper %}
-				<div class="column">
-					<div class="link_button">修改剩余数量</div>
-					<div class="link_button">删除</div>
-					<div class="link_button">修改图片</div>
+				<div class="row" style="gap:2pt">
+					<button class="link_button" style="font-size:0.8rem"
+						onclick="dialog_changeRestNum.showModal()">修改剩余数量</div>
+					<button class="link_button" style="font-size:0.8rem"
+						onclick="deleteItem(${item.item_id})">删除</div>
+					<button class="link_button" style="font-size:0.8rem">修改图片</div>
 				</div>
 				{%endif%}
 			</div>
 		`
+		} else { //已经创建了结构，只需要更新
+			document.getElementById(`${item.item_id}_item_name`)
+				.innerHTML = item.item_name;
+			document.getElementById(`${item.item_id}_rest_num`)
+				.innerHTML = `剩余${item.rest_num}`;
+			{%if isShopper %}
+			document.getElementById(`${item.item_id}_rest_num_2`)
+				.innerHTML = `${item.rest_num}`;
+			{%endif%}
+		}
 	}
 
 	// 更新一次商品列表
@@ -123,14 +158,20 @@
 					statusText.innerHTML = ""
 					console.log("get_items: ",json);
 					for(const item of json) {
-						if(itemid_element.has(item.item_id)) {
+						if(item.item_id in itemid_element) {
 							//列表中已经存在
 							updateItem(itemid_element[item.item_id],item);
 						} else {
 							//需要添加到末尾
 							item_element = document.createElement("div")
-							item_element.class = "item"
+							item_element.className = "item"
 							itemarea.appendChild(item_element)
+							{% if not isShopper%}
+							item_selected_num[item.item_id] = 0;
+							{% else %}
+							item_element.style = 
+								"height:9rem;flex-wrap:wrap;align-content:space-around;"
+							{% endif %}
 							updateItem(item_element,item)
 							//记录
 							itemid_element[item.item_id] = item_element
@@ -147,6 +188,51 @@
 	function addItem() {
 		dialog_createItem.showModal();
 	}
+	
+	{% if isShopper %}
+	// 提交创建的餐品
+	function submit_createItem() {
+		const xhr = new XMLHttpRequest();
+		const form = new FormData(document.getElementById('form_createItem'))
+		xhr.open("POST","/shop/{{shop_id}}/add_item",true)
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState === XMLHttpRequest.DONE) {
+				const response = JSON.parse(xhr.responseText);
+				if (xhr.status == 200) {
+					//上传成功，等待自动刷新商品列表即可。
+				} else {
+					alert('上传失败：' + response['errorMsg']);
+				}
+			}
+		}
+		xhr.send(form)
+	}
+	{% endif %}
+	
+	{% if isShopper %}
+	// 删除一件商品
+	function deleteItem(item_id) {
+		//从列表中删除
+		if(item_id in itemid_element) {
+			let element = itemid_element[item_id]
+			element.remove()
+			delete itemid_element[item_id]
+			const xhr = new XMLHttpRequest();
+			xhr.open("GET","/shop/{{shop_id}}/deleteItem?item_id="+item_id,true)
+			xhr.onreadystatechange = function() {
+				if (xhr.readyState === XMLHttpRequest.DONE) {
+					const response = JSON.parse(xhr.responseText);
+					if (xhr.status == 200) {
+						//删除成功
+					} else {
+						alert('删除失败：' + response['errorMsg']);
+					}
+				}
+			}
+			xhr.send()
+		}
+	}
+	{% endif %}
 	
 	setInterval(updateItems,6000) // 6秒更新一次当前餐品
 	
