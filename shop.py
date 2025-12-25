@@ -6,6 +6,7 @@ from logging import exception
 
 import mysql.connector.errors
 
+import my_order
 import shared
 import db
 from flask import (make_response, session, render_template, redirect, request, jsonify)
@@ -17,6 +18,7 @@ def add_url_rules(app):
     app.add_url_rule("/shoplist", view_func=shoplist_page)
     app.add_url_rule("/shop/<int:shop_id>", view_func=shop_page)
     app.add_url_rule("/shop/<int:shop_id>/create_pay",view_func=pay_order,methods=["POST"])
+    app.add_url_rule("/shop/<int:shop_id>/test_order_skipPay", view_func=test_order_skipPay, methods=["POST"])
     app.add_url_rule("/shop/<int:shop_id>/get_items",view_func=get_shop_items)
     app.add_url_rule("/shop/<int:shop_id>/add_item", view_func=add_shop_item, methods=["POST"])
     app.add_url_rule("/shop/<int:shop_id>/changeRestNum",view_func=change_item_rest_num,methods=["POST"])
@@ -160,8 +162,7 @@ def change_item_rest_num(shop_id):
             #注意，javascript字典的键总是str类型，因此这里要判断item_id的类型
             if isinstance(item_id,str):
                 item_id = int(item_id)
-            cursor.execute("UPDATE shop_items SET rest_num = GREATEST(0,rest_num+%s) WHERE shop_id=%s AND item_id=%s"
-                           "  FOR UPDATE",
+            cursor.execute("UPDATE shop_items SET rest_num = GREATEST(0,rest_num+%s) WHERE shop_id=%s AND item_id=%s",
                            (addNum,shop_id,item_id))
         conn.commit() #提交
         return "",200 #成功
@@ -275,7 +276,7 @@ def verify_order_items_then_sub(shop_id,items):
         # 只锁定本订单涉及到的餐品
         cursor.execute(f"SELECT item_id,rest_num FROM shop_items WHERE shop_id = %s"
                        f" AND item_id IN ({placeholders}) FOR UPDATE",
-                       [shop_id]+[int(item_id) for item_id,num in items.items()])
+                       [shop_id]+[int(item_id) for item_id,num in items.items() if num > 0])
         itemlist = cursor.fetchall()
 
         # 如果查询到的item数量!=items数量，大概率意味着item_id不存在于该商铺
@@ -312,6 +313,43 @@ def verify_order_items_then_sub(shop_id,items):
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
+
+
+# 测试函数，无需支付，直接创建订单（因为支付宝的沙箱环境有时候会报系统繁忙)
+def test_order_skipPay(shop_id):
+    if not shared.check_logined_and_role("customer"):  # 只允许顾客用户下单
+        return "{\"errorMsg\":\"请登录\"}", 400
+
+        # 获取点餐列表json
+    order_content = request.data.decode()
+
+    if not order_content: return "{}", 400
+
+    order_items = json.loads(order_content)
+
+    username = session.get('username', None)
+    if not username:
+        return jsonify({"errorMsg": ""}), 400
+
+    # [!] 查询这位用户有没有历史订单，如果有，这次创建订单和上次创建订单的时间间隔至少大于 > 20s. todo
+
+    # r = db.do_query("SELECT create_time FROM alipay_trade WHERE username = %s ORDER BY create_time DESC LIMIT 1",
+    #               (username,))
+    # if r == None or len(r) > 0: // to-do
+
+    # [!] 验证order_items，如果验证通过，则减去库存。
+    if not verify_order_items_then_sub(shop_id, order_items):
+        return jsonify({"errorMsg": "点餐失败，可能是您点的餐品刚刚被卖完了"}), 400
+
+    # 验证成功
+    total_amount = calcItemsPrice(order_items)
+
+    # 记录交易
+    order_id = my_order.create_payed_making_order(order_content,username,shop_id,total_amount)
+    if order_id >= 0:
+        return "",200
+    else:
+        return jsonify({"errorMsg": "创建订单失败create_payed_making_order"}), 500
 
 # 请留意pay和order的关系，先创建pay支付，支付成功后才会真正创建order
 # 创建pay，必须预留餐品
@@ -350,8 +388,8 @@ def pay_order(shop_id):
     try:
         conn = db.get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO alipay_trade (username,out_trade_no,total_amount,order_content) "
-                       "VALUES (%s,%s,%s,%s)",(username,out_trade_no,total_amount,order_content))
+        cursor.execute("INSERT INTO alipay_trade (username,out_trade_no,total_amount,order_content,belong_shop) "
+                       "VALUES (%s,%s,%s,%s,%s)",(username,out_trade_no,total_amount,order_content,shop_id))
         conn.commit()
         return jsonify({"pay_url":pay_url}),200
     except Exception as e:

@@ -27,14 +27,15 @@
 		</div>
 		<div class="bottomBar">
 			{%if isShopper %}
-			<button class="link_button">订单列表</button>
+			<button class="link_button" onclick="window.location.href='/my_orders'">订单列表</button>
 			<button class="accent_button" onclick="addItem()">创建餐品</button>
 			<button class="accent_button">店铺设置</button>
 			{%else%}
-			<button class="link_button">我的订单</button>
+			<button class="link_button" onclick="window.location.href='/my_orders'">
+			我的订单</button>
 			<button class="accent_button" onclick="do_post_order_testSkipPay()"
-				style="font-size:6pt;">
-				(测试)如果沙箱系统繁忙，直接免支付下单</button>
+				style="font-size:7pt;">
+				(测试)若沙箱系统繁忙，免支付下单</button>
 			<button class="accent_button" onclick="do_post_order()">我选好了</button>
 			{%endif%}
 		</div>
@@ -188,10 +189,11 @@
 	// 顾客上传订单
 	function do_post_order() {
 		let isOrderEmpty = true;
+		let buy_items = {}
 		for(let item_id in item_selected_num) {
 			if(item_selected_num[item_id] != 0) {
 				isOrderEmpty = false;
-				break;
+				buy_items[item_id] = item_selected_num[item_id];
 			}
 		}
 		if(isOrderEmpty) {
@@ -210,6 +212,37 @@
 					const response = JSON.parse(xhr.responseText);
 					//前往支付url
 					window.location.href = response["pay_url"];
+				} else {
+					const response = JSON.parse(xhr.responseText);
+					alert("下单失败："+response["errorMsg"])
+				}
+			}
+		}
+		xhr.send(JSON.stringify(buy_items));
+	}
+	
+	function do_post_order_testSkipPay() {
+		let isOrderEmpty = true;
+		for(let item_id in item_selected_num) {
+			if(item_selected_num[item_id] != 0) {
+				isOrderEmpty = false;
+				break;
+			}
+		}
+		if(isOrderEmpty) {
+			alert("订单不能为空，再看看点些什么吧！")
+			return;
+		}
+		const xhr = new XMLHttpRequest();
+		xhr.open("POST","/shop/{{shop_id}}/test_order_skipPay",true)
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState == XMLHttpRequest.DONE) {
+				if (xhr.status == 200) {
+					//清除order
+					for(let item_id in item_selected_num) {
+						item_selected_num[item_id] = 0;
+					}
+					alert("免支付下单成功，可以在\"我的订单\"查看订单")
 				} else {
 					const response = JSON.parse(xhr.responseText);
 					alert("下单失败："+response["errorMsg"])

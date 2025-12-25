@@ -58,7 +58,7 @@ def api_exit_login():
 def pass_shopper():
     password = request.form.get("password")
     print("pwd:",password)
-    if password != "#eFaT&^uia92OP_+G+-]@!~4u56^%hs{adDHB":
+    if password != shared.R0_PASSWORD:
         return "密码错误",400
     shop_user = request.form.get("shop_user")
     try:

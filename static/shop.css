@@ -63,3 +63,14 @@
 	font-family: Times New Roman;
 }
 
+.order_item {
+	background: white;
+	margin-top: 7pt;
+	margin-left: 10pt;
+	margin-right: 10pt;
+	padding-left: 4pt;
+	padding-right: 15pt;
+	padding-bottom: 7pt;
+	box-shadow: 0 1px 5px #60262626;
+}
+

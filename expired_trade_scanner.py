@@ -37,7 +37,7 @@ class TradeOrderScanner:
             cursor.execute("SELECT out_trade_no FROM alipay_trade "
                            "WHERE create_time < %s ORDER BY create_time LIMIT 100 FOR UPDATE",
                            (expired_datetime,))
-            
+
         except Exception as e:
             traceback.print_exc()
         finally:

@@ -1,4 +1,6 @@
 import threading
+import traceback
+
 import mysql.connector
 from mysql.connector import pooling
 from numpy.lib.function_base import place
@@ -28,6 +30,7 @@ def do_query(sql,placeholders):
         cursor.execute(sql,placeholders)
         return cursor.fetchall()
     except Exception as e:
+        traceback.print_exc()
         return None
     finally:
         if cursor: cursor.close()

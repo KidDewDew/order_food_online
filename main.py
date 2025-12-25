@@ -8,6 +8,7 @@ from flask import (Flask, request, render_template, make_response,
 import api
 import shop
 import pay
+import my_order
 
 app = Flask(__name__)
 
@@ -35,6 +36,7 @@ if __name__ == "__main__":
     shop.add_url_rules(app)
     pay.add_url_rules(app)
     auth.add_url_rules(app)
+    my_order.add_url_rules(app)
 
     app.secret_key = shared.generate_random_codes(16,shared.RANDOM_STR_2)
     app.run(host="0.0.0.0")

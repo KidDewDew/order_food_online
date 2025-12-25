@@ -24,6 +24,13 @@ ShopStatus_Normal = 0
 ShopStatus_Reserve = 1
 ShopStatus_Dead = 2
 
+OrderStatus_Making = 0   #制作中
+OrderStatus_ToFetch = 1   #待取餐
+OrderStatus_Fetched = 2  #已取餐
+
+# 软件密码，用于自己的接口间通信
+R0_PASSWORD = "#eFaT&^uia92OP_+G+-]@!~4u56^%hs{adDHB"
+
 '''一些辅助函数'''
 # 生成长度为length的随机字符串，从choices中选取字符
 def generate_random_codes(length,choices):

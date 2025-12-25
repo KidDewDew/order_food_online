@@ -68,11 +68,11 @@ button:active {
 }
 
 .img_button {
-	width: 19pt;
+	width: auto;
 	height: 19pt;
 }
 .img_button_big {
-	width: 32pt;
+	width: auto;
 	height: 32pt;
 }
 
@@ -282,6 +282,14 @@ button:active {
 	transform: translate(-2pt,2pt);
 }
 
+.bluebox_text {
+	border: 1px solid #2D60C4;
+	background: #BBD5F7;
+	color: #2D60C4;
+	font-size: 0.7rem;
+	transform: translate(-2pt,2pt);
+}
+
 .round_button {
 	line-height: 1.2rem;
 	text-align: center;
@@ -309,3 +317,9 @@ button:active {
 	color: #707070;
 	font-size: 0.85rem;
 }
+
+.important_text {
+	font-size:1.2rem;
+	font-weight: 600;
+}
+
