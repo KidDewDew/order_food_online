@@ -1,5 +1,5 @@
 import shared
-from flask import (make_response,session)
+from flask import (make_response, session, send_file)
 from captcha.image import ImageCaptcha  #验证码生成
 
 import db
@@ -22,12 +22,13 @@ def get_item_cover(item_id):
     try:
         conn = db.get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("SELECT image_url FROM item_images LIMIT 1 WHERE item_id=%s",(item_id,))
+        cursor.execute("SELECT image_url FROM item_images WHERE item_id=%s LIMIT 1",(item_id,))
         r = cursor.fetchall()
         if len(r) == 0:
             return "",404
-        return r[0][0],200
+        return send_file('.'+r[0][0],"image/png")
     except Exception as e:
+        print(e)
         return "",404
     finally:
         if cursor: cursor.close()

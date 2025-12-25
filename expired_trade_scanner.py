@@ -1,6 +1,9 @@
 import threading
 import time
+import traceback
 from datetime import datetime, timedelta
+
+from numpy.core.defchararray import translate
 
 import db
 
@@ -28,7 +31,16 @@ class TradeOrderScanner:
     def _scan(self):
         # 过期时间
         expired_datetime = datetime.now() - timedelta(seconds=self.timeout)
-        cursor = db.get_cursor()
-        cursor.execute("SELECT out_trade_no FROM alipay_trade "
-                       "WHERE create_time < %s ORDER BY create_time LIMIT 100 FOR UPDATE",
-                       (expired_datetime,))
+        try:
+            conn = db.get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT out_trade_no FROM alipay_trade "
+                           "WHERE create_time < %s ORDER BY create_time LIMIT 100 FOR UPDATE",
+                           (expired_datetime,))
+            
+        except Exception as e:
+            traceback.print_exc()
+        finally:
+            if(cursor): cursor.close()
+            if(conn): conn.close()
+

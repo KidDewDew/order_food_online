@@ -32,13 +32,16 @@
 			<button class="accent_button">店铺设置</button>
 			{%else%}
 			<button class="link_button">我的订单</button>
-			<button class="accent_button">我选好了</button>
+			<button class="accent_button" onclick="do_post_order_testSkipPay()"
+				style="font-size:6pt;">
+				(测试)如果沙箱系统繁忙，直接免支付下单</button>
+			<button class="accent_button" onclick="do_post_order()">我选好了</button>
 			{%endif%}
 		</div>
 	</div>
 	
 	<dialog id="dialog_createItem">
-		<form id="form_createItem" class="login_box">
+		<form id="form_createItem" class="box_2col">
 			<div class="grid_2col_title"> 
 				●○●○ 创建新餐品 ●○●○
 			</div>
@@ -56,6 +59,16 @@
 		</form>
 	</dialog>
 	
+	<dialog id="dialog_inputany">
+		<div class="box_2col">
+			<div id="inputany_title" class="grid_2col_title"> 
+			</div>
+			<div id="inputany_label"></div>
+			<input id="inputany_input">
+			<button type="button" onclick="dialog_inputany.close();">取消</button>
+			<button type="button" onclick="dialog_inputany.close();do_callback_inputany()">提交</button>
+		</div>
+	</dialog>
 	
 </body>
 
@@ -66,8 +79,33 @@
 	var dialog_createItem = document.getElementById("dialog_createItem")
 	var input_image = document.getElementById("input_image");
 	
-	input_image.addEventListener('change',changePreviewImage);
+	var dialog_inputany = document.getElementById("dialog_inputany");
+	var inputany_title = document.getElementById("inputany_title");
+	var inputany_input = document.getElementById("inputany_input");
+	var inputany_label = document.getElementById("inputany_label");
 	
+	var do_callback_inputany;
+	
+	var need_toAddRestNum = {};   //存储需要修改剩余数量的值
+	
+	var latest_saved_items = {};  //最近一次获取的商品列表，不允许做修改
+	
+	function doInput(labelName,callback) {
+		inputany_label.innerHTML = labelName;
+		inputany_title.innerHTML = "请输入" + labelName + ":"
+		do_callback_inputany = function() {
+			callback(inputany_input.value);
+		}
+		dialog_inputany.showModal();
+	}
+	
+	var itemid_element = {} //记录item_id到item元素的映射
+	{%if not isShopper %}
+	var item_selected_num = {} //记录当前用户购物车: item_id->num
+	{%endif%}
+	
+	
+	{%if isShopper %}
 	function changePreviewImage(e) {
 		const files = e.target.files;
 		const img = document.getElementById("item_image");
@@ -77,14 +115,147 @@
 		}
 	}
 	
-	var itemid_element = {} //记录item_id到item元素的映射
-	{%if not isShopper %}
-	var item_selected_num = {} //记录当前用户购物车: item_id->num
+	input_image.addEventListener('change',changePreviewImage);
+	
+	// 把对剩余数量的修改告诉后端
+	// 为了避免每次点击+/-都发送请求，请每隔一段时间、按需调用该函数
+	function changeRestNum() {
+		let needToChanged = false; //是否需要修改
+		for(let item_id in need_toAddRestNum) {
+			if(need_toAddRestNum[item_id] != 0) {
+				needToChanged = true;
+				break;
+			}
+		}
+		if( ! needToChanged) return; //没有修改任务
+		
+		const xhr = new XMLHttpRequest();
+		xhr.open("POST","/shop/{{shop_id}}/changeRestNum",true)
+		xhr.setRequestHeader("Content-Type", "application/json");
+		
+		xhr.onreadystatechange = function() {}
+		
+		xhr.send(JSON.stringify(need_toAddRestNum))
+		
+		need_toAddRestNum = {} //清空
+		
+	}
+
+	//do_add/sub: 商家修改餐品数量
+	function do_add(item_id) {
+		if(!(item_id in need_toAddRestNum)) {
+			need_toAddRestNum[item_id] = 0;
+		}
+		++ need_toAddRestNum[item_id];
+		const ori = latest_saved_items[item_id].rest_num;
+		document.getElementById(`${item_id}_rest_num_2`)
+				.innerHTML = `${ori}->${need_toAddRestNum[item_id]+ori}`;
+	}
+	function do_sub(item_id) {
+		if(!(item_id in need_toAddRestNum)) {
+			need_toAddRestNum[item_id] = 0;
+		}
+		-- need_toAddRestNum[item_id];
+		const ori = latest_saved_items[item_id].rest_num;
+		document.getElementById(`${item_id}_rest_num_2`)
+				.innerHTML = `${ori}->${need_toAddRestNum[item_id]+ori}`;
+	}
+	{%else%} //do_add/sub: 顾客选餐
+	function do_add(item_id) {
+		if(!(item_id in item_selected_num)) {
+			item_selected_num[item_id] = 0;
+		}
+		if(item_selected_num[item_id] + 1 > latest_saved_items[item_id].rest_num) {
+			document.getElementById(`${item_id}_selected_num`)
+				.innerHTML = `${item_selected_num[item_id]}(max)`;
+			return;
+		}
+		++ item_selected_num[item_id];
+		document.getElementById(`${item_id}_selected_num`)
+				.innerHTML = `${item_selected_num[item_id]}`;
+	}
+	function do_sub(item_id) {
+		if(!(item_id in item_selected_num)) {
+			item_selected_num[item_id] = 0;
+		}
+		if(item_selected_num[item_id] > 0) {
+			-- item_selected_num[item_id];
+			document.getElementById(`${item_id}_selected_num`)
+					.innerHTML = `${item_selected_num[item_id]}`;
+		}
+	}
+	
+	// 顾客上传订单
+	function do_post_order() {
+		let isOrderEmpty = true;
+		for(let item_id in item_selected_num) {
+			if(item_selected_num[item_id] != 0) {
+				isOrderEmpty = false;
+				break;
+			}
+		}
+		if(isOrderEmpty) {
+			alert("订单不能为空，再看看点什么吧！")
+			return;
+		}
+		const xhr = new XMLHttpRequest();
+		xhr.open("POST","/shop/{{shop_id}}/create_pay",true)
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState == XMLHttpRequest.DONE) {
+				if (xhr.status == 200) {
+					//清除order
+					for(let item_id in item_selected_num) {
+						item_selected_num[item_id] = 0;
+					}
+					const response = JSON.parse(xhr.responseText);
+					//前往支付url
+					window.location.href = response["pay_url"];
+				} else {
+					const response = JSON.parse(xhr.responseText);
+					alert("下单失败："+response["errorMsg"])
+				}
+			}
+		}
+		xhr.send(JSON.stringify(item_selected_num));
+	}
+	
 	{%endif%}
+
+	function do_changePrice(item_id,price_str) {
+		console.log(item_id,"price->",price_str);
+		
+		const val = parseFloat(price_str);
+		
+		if(isNaN(val)) {
+			alert("请输入正确的数值")
+			return
+		}
+		
+		if(val > 1000 || val < 0) {
+			alert("无效价格");
+			return
+		}
+		
+		const xhr = new XMLHttpRequest();
+		xhr.open("GET","/shop/{{shop_id}}/changeItemPrice?price="+price_str+"&item_id="+item_id,true)
+		xhr.onreadystatechange = function() {
+			if (xhr.readyState === XMLHttpRequest.DONE) {
+				document.getElementById(`${item_id}_rest_num`)
+				.innerHTML += "->"+price_str;
+			} else {
+				const response = JSON.parse(xhr.responseText);
+				alert(response["errorMsg"])
+			}
+		}
+		xhr.send()
+	}
 
 	// 根据item json数据更新item_element元素
 	function updateItem(item_element,item) {
 		if(item_element.children.length == 0) { //第一次创建该item_element
+		
+		const s_cgprice = ""
+		
 		item_element.innerHTML = 
 		`
 			<img class="item_image" src="/api/get_item_cover/${item.item_id}">
@@ -94,12 +265,18 @@
 			<div class="item_right" style="height:5rem">
 			{% endif %}
 				<div id="${item.item_id}_item_name" class="item_name">${item.item_name}</div>
+				{%if isShopper %}
+				<div id="${item.item_id}_rest_num" class="item_rest_num">剩余${item.rest_num}份 ￥${item.price}</div>
+				{%else%}
 				<div id="${item.item_id}_rest_num" class="item_rest_num">剩余${item.rest_num}份</div>
+				{%endif%}
 				{%if isShopper %}
 				<div class="row">
 					<div style="font-size:0.7rem;">修改价格：￥</div>
-					<input style="width:3rem;">
-					<button type="button" style="font-size:0.7rem;width:4rem;">提交</button>
+					<input id="${item.item_id}_new_price" style="width:3rem;" value="${item.price}">
+					<button type="button" style="font-size:0.7rem;width:2.4rem;padding-left:3pt;padding-right:3pt"
+						onclick="do_changePrice(${item.item_id},document.getElementById('${item.item_id}'+'_new_price').value)">
+						提交</button>
 				</div>
 				{%else%}
 				<div class="item_price">￥${item.price}</div>
@@ -109,7 +286,7 @@
 			<div style="flex-grow:1"></div>
 			{% endif %}
 			<div class="row">
-				<div class="round_button">+</div>
+				<button class="round_button" onclick="do_add(${item.item_id})">+</button>
 					
 				<div style="display:flex;gap:2pt;align-items:end;">
 					{%if isShopper %}
@@ -118,11 +295,11 @@
 						<div id="${item.item_id}_rest_num_2">${item.rest_num}</div>
 					</div>
 					{%else%}
-					<div>${item_selected_num[item.item_id]}</div>
+					<div id="${item.item_id}_selected_num">${item_selected_num[item.item_id]}</div>
 					{%endif%}
 					<div style="font-size:0.7rem;color:grey">份</div>
 				</div>
-				<div class="round_button">-</div>
+				<button class="round_button" onclick="do_sub(${item.item_id})">-</button>
 				{%if isShopper %}
 				<div class="row" style="gap:2pt">
 					<button class="link_button" style="font-size:0.8rem"
@@ -137,8 +314,13 @@
 		} else { //已经创建了结构，只需要更新
 			document.getElementById(`${item.item_id}_item_name`)
 				.innerHTML = item.item_name;
+			{% if not isShopper %}
 			document.getElementById(`${item.item_id}_rest_num`)
 				.innerHTML = `剩余${item.rest_num}`;
+			{% else %}
+			document.getElementById(`${item.item_id}_rest_num`)
+				.innerHTML = `剩余${item.rest_num}份 ￥${item.price}`;
+			{% endif %}
 			{%if isShopper %}
 			document.getElementById(`${item.item_id}_rest_num_2`)
 				.innerHTML = `${item.rest_num}`;
@@ -158,6 +340,7 @@
 					statusText.innerHTML = ""
 					console.log("get_items: ",json);
 					for(const item of json) {
+						latest_saved_items[item.item_id] = item //记录item
 						if(item.item_id in itemid_element) {
 							//列表中已经存在
 							updateItem(itemid_element[item.item_id],item);
@@ -170,7 +353,9 @@
 							item_selected_num[item.item_id] = 0;
 							{% else %}
 							item_element.style = 
-								"height:9rem;flex-wrap:wrap;align-content:space-around;"
+								`height:auto;flex-wrap:wrap;
+								align-content:space-around;
+								align-items:center;`
 							{% endif %}
 							updateItem(item_element,item)
 							//记录
@@ -237,6 +422,8 @@
 	setInterval(updateItems,6000) // 6秒更新一次当前餐品
 	
 	updateItems() //立即获取商品列表
+	
+	setInterval(changeRestNum,2000) //2秒提交一次数量修改(如果需要修改的话)
 </script>
 
 </html>

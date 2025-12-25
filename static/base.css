@@ -93,6 +93,21 @@ button:active {
 	background-color: var(--box);
 	padding: 0.6rem;
 }
+
+.box_2col {
+	display: grid;
+	position: fixed;
+	top: 50%; left: 50%;
+	transform: translate(-50%,-50%);
+	grid-template-columns:4rem min(14rem,50vw);
+	row-gap: 0.3rem;
+	column-gap: 1.2rem;
+	border: 0.1rem solid var(--border);
+	border-radius: 6px;
+	background-color: var(--box);
+	padding: 0.6rem;
+}
+
 .grid_2col_title {
 	grid-column: span 2;
 	justify-self:center;

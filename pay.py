@@ -15,6 +15,7 @@ def add_url_rules(app):
 
 def create_alipay_order_url(subject,total_amount,describe):
     out_trade_no = shared.generate_random_id()
+    # 由于Alipay给python的接口文档太少了，所以这里构建的付款url是指向tomcat 8080端口的
     url = (f"http://47.120.51.172:8080/alipay-wappay/wappay/pay.jsp?"
            f"WIDout_trade_no={out_trade_no}"
            f"&WIDsubject={subject}"

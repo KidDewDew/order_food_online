@@ -1,6 +1,7 @@
 import json
 import os
 import random
+import traceback
 from logging import exception
 
 import mysql.connector.errors
@@ -15,9 +16,12 @@ import pay
 def add_url_rules(app):
     app.add_url_rule("/shoplist", view_func=shoplist_page)
     app.add_url_rule("/shop/<int:shop_id>", view_func=shop_page)
-    app.add_url_rule("/shop/<int:shop_id>/create_pay",view_func=pay_order)
+    app.add_url_rule("/shop/<int:shop_id>/create_pay",view_func=pay_order,methods=["POST"])
     app.add_url_rule("/shop/<int:shop_id>/get_items",view_func=get_shop_items)
     app.add_url_rule("/shop/<int:shop_id>/add_item", view_func=add_shop_item, methods=["POST"])
+    app.add_url_rule("/shop/<int:shop_id>/changeRestNum",view_func=change_item_rest_num,methods=["POST"])
+    app.add_url_rule("/shop/<int:shop_id>/changeItemPrice",view_func=change_item_price)
+    app.add_url_rule("/shop/<int:shop_id>/deleteItem", view_func=delete_shop_item)
 
 def shoplist_page():
     try:
@@ -84,6 +88,7 @@ def get_shop_items(shop_id):
         if cursor: cursor.close()
         if conn: conn.close()
 
+# 检查某个店铺是否属于当前用户
 def check_shop_belong(shop_id):
     username = session.get('username')
     r = db.do_query("SELECT shop_id FROM user_shop WHERE username=%s LIMIT 1",(username,))
@@ -91,11 +96,18 @@ def check_shop_belong(shop_id):
         return False
     return r[0][0] == shop_id
 
+# 检查一个商品是否属于某个店铺
+def check_item_belong(shop_id,item_id):
+    r = db.do_query("SELECT * FROM shop_items WHERE shop_id=%s AND item_id=%s",(shop_id,item_id))
+    if len(r) == 0:
+        return False
+    return True
+
 # 给店铺添加一个新餐品
 def add_shop_item(shop_id):
 
     if not shared.check_logined_and_role("shopper"): #验证权限
-        return "{\"errorMsg\":\"请登录\"}"
+        return "{\"errorMsg\":\"请登录\"}",400
 
     item_name = request.form.get("item_name",None)
     price = request.form.get("price",None)
@@ -130,6 +142,66 @@ def add_shop_item(shop_id):
         if cursor: cursor.close()
         if conn: conn.close()
 
+# 修改一个或多个商品的数量add/sub
+def change_item_rest_num(shop_id):
+
+    if not shared.check_logined_and_role("shopper"): #验证权限
+        return "{\"errorMsg\":\"请登录\"}",400
+
+    if not check_shop_belong(shop_id): #验证店铺是否属于用户
+        return jsonify({"errorMsg": "异常操作"}), 403
+
+    data = json.loads(request.data.decode())
+    # data: {"item_id":addNum}
+    try:
+        conn = db.get_db_connection()
+        cursor = conn.cursor()
+        for item_id,addNum in data.items(): #MAX(0,rest_num+addNum)，至少为0
+            #注意，javascript字典的键总是str类型，因此这里要判断item_id的类型
+            if isinstance(item_id,str):
+                item_id = int(item_id)
+            cursor.execute("UPDATE shop_items SET rest_num = GREATEST(0,rest_num+%s) WHERE shop_id=%s AND item_id=%s"
+                           "  FOR UPDATE",
+                           (addNum,shop_id,item_id))
+        conn.commit() #提交
+        return "",200 #成功
+    except Exception as e:
+        if conn: conn.rollback()
+        traceback.print_exc()
+        return jsonify({"errorMsg": "数据库操作失败"}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+# 修改商品价格
+def change_item_price(shop_id):
+    if not shared.check_logined_and_role("shopper"): #验证权限
+        return "{\"errorMsg\":\"请登录\"}",400
+    if not check_shop_belong(shop_id): #检查用户是否有shopper权限
+        return jsonify({"errorMsg": "异常操作"}), 403
+    item_id = request.args.get("item_id", None)
+    new_price = request.args.get("price",None)
+    if item_id is None or new_price is None:
+        return jsonify({"errorMsg": "无效参数"}), 403
+
+    # 检查这个商品是否归属于这个shop
+    if not check_item_belong(shop_id,item_id):
+        return jsonify({"errorMsg": "您不能修改别家店铺的商品价格！"}), 403
+
+    try:
+        conn = db.get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE item SET price=GREATEST(0,%s) WHERE item_id=%s",(new_price,item_id))
+        conn.commit()
+        return "",200
+    except Exception as e:
+        if conn: conn.rollback()
+        traceback.print_exc()
+        return jsonify({"errorMsg": "数据库操作失败"}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
 # 删除一个餐品
 def delete_shop_item(shop_id):
     if not shared.check_logined_and_role("shopper"): #验证权限
@@ -150,7 +222,7 @@ def delete_shop_item(shop_id):
         conn = db.get_db_connection()
         cursor = conn.cursor()
         # 注意，不会把item彻底删除，它仍存在于item表。但shop不再记录它
-        cursor.execute("DELETE shop_")
+        cursor.execute("DELETE FROM shop_items WHERE shop_id=%s AND item_id=%s",(shop_id,item_id))
         conn.commit()
     except Exception as e:
         if conn: conn.rollback()
@@ -164,14 +236,14 @@ def calcItemsPrice(items):
         conn = db.get_db_connection()
         cursor = conn.cursor()  # 事务开始
         total_amount = 0.0
-        for item in items:
-            cursor.execute("SELECT price FROM item WHERE item_id=%s",(item['item_id'],))
+        for item_id,num in items.items():
+            cursor.execute("SELECT price FROM item WHERE item_id=%s",(int(item_id),))
             r = cursor.fetchall()
             if len(r) != 1:
                 cursor.close()
                 return -1.0
             price = r[0][0]
-            total_amount += price * item['num']
+            total_amount += price * num
         cursor.close()
         return total_amount
     except Exception as e:
@@ -190,8 +262,8 @@ def verify_order_items_then_sub(shop_id,items):
     if len(items) == 0:
         return False
 
-    for item in items:
-        if item["num"] <= 0:
+    for item_id,num in items.items():
+        if num <= 0:
             return False
 
     conn = db.get_db_connection()
@@ -202,7 +274,8 @@ def verify_order_items_then_sub(shop_id,items):
         placeholders = ','.join(['%s'] * len(items))
         # 只锁定本订单涉及到的餐品
         cursor.execute(f"SELECT item_id,rest_num FROM shop_items WHERE shop_id = %s"
-                       f" AND item_id IN ({placeholders}) FOR UPDATE",[shop_id]+[item["item_id"] for item in items])
+                       f" AND item_id IN ({placeholders}) FOR UPDATE",
+                       [shop_id]+[int(item_id) for item_id,num in items.items()])
         itemlist = cursor.fetchall()
 
         # 如果查询到的item数量!=items数量，大概率意味着item_id不存在于该商铺
@@ -213,19 +286,20 @@ def verify_order_items_then_sub(shop_id,items):
         itemdict = {}
         for item in itemlist:
             itemdict[item[0]] = item[1]
-        for item in items:
-            item_id = item["item_id"]
+        for item_id,num in items.items():
+            if isinstance(item_id,str):
+                item_id = int(item_id)
             if item_id not in itemdict:
                 conn.rollback()
                 return False #验证失败，无效item_id，它不属于这个店铺！
-            if item["num"] > itemdict[item_id]:
+            if num > itemdict[item_id]:
                 conn.rollback()
                 return False #验证失败，商铺的该item数量不够了。
 
         # 验证通过，立即更新数据库
-        for item in items:
-            item_id = item["item_id"]
-            sub_num = item["num"]
+        for item_id,sub_num in items.items():
+            if isinstance(item_id,str):
+                item_id = int(item_id)
             cursor.execute("UPDATE shop_items SET rest_num = rest_num-%s WHERE shop_id=%s AND item_id=%s",
                                 (sub_num,shop_id,item_id))
 
@@ -233,18 +307,21 @@ def verify_order_items_then_sub(shop_id,items):
         return True
     except Exception as e:
         if conn: conn.rollback()
+        traceback.print_exc()
         return False
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
 
+# 请留意pay和order的关系，先创建pay支付，支付成功后才会真正创建order
+# 创建pay，必须预留餐品
 def pay_order(shop_id):
 
     if not shared.check_logined_and_role("customer"): #只允许顾客用户下单
         return "{\"errorMsg\":\"请登录\"}",400
 
     # 获取点餐列表json
-    order_content = request.form.get("order_items",None)
+    order_content = request.data.decode()
 
     if not order_content: return "{}",400
 
@@ -254,10 +331,10 @@ def pay_order(shop_id):
     if not username:
         return jsonify({"errorMsg":""}),400
 
-    # [!] 查询这位用户有没有历史订单，如果有，这次创建订单和上次创建订单的时间间隔至少大于 > 20s.
+    # [!] 查询这位用户有没有历史订单，如果有，这次创建订单和上次创建订单的时间间隔至少大于 > 20s. todo
 
-    r = db.do_query("SELECT create_time FROM alipay_trade WHERE username = %s ORDER BY create_time DESC LIMIT 1",
-                   (username,))
+    # r = db.do_query("SELECT create_time FROM alipay_trade WHERE username = %s ORDER BY create_time DESC LIMIT 1",
+    #               (username,))
     #if r == None or len(r) > 0: // to-do
 
     # [!] 验证order_items，如果验证通过，则减去库存。
@@ -268,18 +345,19 @@ def pay_order(shop_id):
     total_amount = calcItemsPrice(order_items)
 
     # 获取支付url和商品编号
-    pay_url,out_trade_no = pay.create_alipay_order_url("点餐订单",100.0,"")
+    pay_url,out_trade_no = pay.create_alipay_order_url("Your Order",total_amount,"")
     # 记录交易
     try:
         conn = db.get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO alipay_trade (username,pay_url,out_trade_no,total_amount,order_content) "
-                       "VALUES (%s,%s,%s,%s,%s)",(username,pay_url,out_trade_no,total_amount,order_content))
+        cursor.execute("INSERT INTO alipay_trade (username,out_trade_no,total_amount,order_content) "
+                       "VALUES (%s,%s,%s,%s)",(username,out_trade_no,total_amount,order_content))
         conn.commit()
         return jsonify({"pay_url":pay_url}),200
     except Exception as e:
         if conn: conn.rollback()
-        return jsonify({"errorMsg":""}),400
+        traceback.print_exc()
+        return jsonify({"errorMsg":"数据库操作异常"}),400
     finally:
         if cursor: cursor.close()
         if conn: conn.close()
