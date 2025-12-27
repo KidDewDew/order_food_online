@@ -19,13 +19,20 @@ def api_login():
     username = request.form.get('username')
     password = request.form.get('password')
     verify_code = request.form.get('verify_code')
-    if verify_code != session.pop('verify_code',None):
+    
+    # 验证验证码（先验证验证码，避免不必要的数据库查询）
+    session_verify_code = session.pop('verify_code', None)
+    if not verify_code or verify_code != session_verify_code:
         return jsonify({"errorMsg":"验证码错误"}),400
 
+    # 验证用户名和密码
     r = db.do_query("SELECT password_md5,user_type,user_status FROM user WHERE username=%s",(username,))
 
-    if not r or len(r) == 0 or r[0][2] == shared.UserStatus_Dead:
+    if not r or len(r) == 0:
         return jsonify({"errorMsg":"该用户不存在"}),400
+    
+    if r[0][2] == shared.UserStatus_Dead:
+        return jsonify({"errorMsg":"该用户已被禁用"}),400
 
     if hashlib.md5(password.encode()).hexdigest().lower() != r[0][0].lower():
         return jsonify({"errorMsg":"密码错误"}),400

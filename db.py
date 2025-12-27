@@ -3,7 +3,6 @@ import traceback
 
 import mysql.connector
 from mysql.connector import pooling
-from numpy.lib.function_base import place
 
 # 数据库连接(mysql.connection)
 db_connection = []

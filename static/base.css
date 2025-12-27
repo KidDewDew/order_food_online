@@ -15,6 +15,7 @@
 body {
 	background-color: var(--bg);
 	margin:0;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 input {
 	padding-top: 0.2rem;
@@ -64,7 +65,13 @@ button:active {
 
 .accent_button {
 	border: 1.5pt solid var(--accent);
-	background: white;
+	background: var(--accent);
+	color: white;
+	font-weight: 500;
+}
+.accent_button:hover {
+	background: #E0B482;
+	border-color: #E0B482;
 }
 
 .img_button {
@@ -230,40 +237,43 @@ button:active {
 }
 
 .topBar {
-	
-	height: 36pt;
-	min-height: 36pt;
-	background: var(--box);
-	box-shadow: 0 1px 5px #60262626;
+	height: 44pt;
+	min-height: 44pt;
+	background: white;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 	z-index: 1000;
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
+	padding: 0 1rem;
 }
 
 .topBar > .title {
 	display: flex;
-	align-items: end;
+	align-items: center;
 	gap: 5pt;
 	font-size: 1.2rem;
+	font-weight: 600;
+	color: #333;
 }
 
 .scrollview {
 	flex-grow: 1.0;
 	overflow-y: auto;
+	background: #F5F5F5;
+	-webkit-overflow-scrolling: touch;
 }
 
 .bottomBar {
-	padding-left: 4pt;
-	padding-right: 4pt;
-	padding-bottom: 4pt;
+	padding: 0.5rem 0.75rem;
 	width: 100vw;
-	height: 36pt;
-	background: var(--box);
-	box-shadow: 0 -1px 5px #60262626;
+	min-height: 50pt;
+	background: white;
+	box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
 	display: flex;
 	justify-content: space-around;
 	align-items: center;
+	gap: 0.5rem;
 }
 
 .greenbox_text {

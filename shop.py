@@ -24,6 +24,8 @@ def add_url_rules(app):
     app.add_url_rule("/shop/<int:shop_id>/changeRestNum",view_func=change_item_rest_num,methods=["POST"])
     app.add_url_rule("/shop/<int:shop_id>/changeItemPrice",view_func=change_item_price)
     app.add_url_rule("/shop/<int:shop_id>/deleteItem", view_func=delete_shop_item)
+    app.add_url_rule("/shop/<int:shop_id>/changeShopName", view_func=change_shop_name, methods=["POST"])
+    app.add_url_rule("/shop/<int:shop_id>/changeItemImage", view_func=change_item_image, methods=["POST"])
 
 def shoplist_page():
     try:
@@ -55,7 +57,7 @@ def shop_page(shop_id):
         cursor.execute("SELECT username FROM user_shop WHERE shop_id=%s", (shop_id,))
         r = cursor.fetchall()
         if len(r) == 0:
-            return "<h1>这家店铺不存在哦</h1>",404
+            return render_template("shop_404.html"),404
         shop_username = r[0][0]
         if shop_username == session.get("username",None):
             isShopper = True
@@ -63,7 +65,7 @@ def shop_page(shop_id):
         cursor.execute("SELECT shop_name,shop_position FROM shop WHERE shop_id=%s",(shop_id,))
         r = cursor.fetchall()
         if len(r) == 0:
-            return "<h1>这家店铺不存在哦</h1>",404
+            return render_template("shop_404.html"),404
         return render_template("shop.html",
                                shop_name=r[0][0],
                                shop_id=shop_id,
@@ -231,6 +233,91 @@ def delete_shop_item(shop_id):
         if cursor: cursor.close()
         if conn: conn.close()
 
+# 修改店铺名称
+def change_shop_name(shop_id):
+    if not shared.check_logined_and_role("shopper"): #验证权限
+        return jsonify({"errorMsg":"请登录"}),400
+    if not check_shop_belong(shop_id): #检查用户是否有shopper权限
+        return jsonify({"errorMsg": "异常操作"}), 403
+    
+    new_name = request.form.get("shop_name", None)
+    if not new_name or len(new_name.strip()) == 0:
+        return jsonify({"errorMsg": "店铺名称不能为空"}), 400
+    if len(new_name) > 50:
+        return jsonify({"errorMsg": "店铺名称过长"}), 400
+    
+    try:
+        conn = db.get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE shop SET shop_name=%s WHERE shop_id=%s",(new_name.strip(),shop_id))
+        conn.commit()
+        return jsonify({"msg":"修改成功"}),200
+    except Exception as e:
+        if conn: conn.rollback()
+        traceback.print_exc()
+        return jsonify({"errorMsg": "数据库操作失败"}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
+# 修改商品图片
+def change_item_image(shop_id):
+    if not shared.check_logined_and_role("shopper"): #验证权限
+        return jsonify({"errorMsg":"请登录"}),400
+    if not check_shop_belong(shop_id): #检查用户是否有shopper权限
+        return jsonify({"errorMsg": "异常操作"}), 403
+    
+    item_id = request.form.get("item_id", None)
+    image = request.files.get("image") # 新的图片
+    
+    if not item_id:
+        return jsonify({"errorMsg": "商品ID不能为空"}), 400
+    if not image:
+        return jsonify({"errorMsg": "请选择图片"}), 400
+    
+    # 检查这个商品是否归属于这个shop
+    if not check_item_belong(shop_id,item_id):
+        return jsonify({"errorMsg": "您不能修改别家店铺的商品图片！"}), 403
+    
+    try:
+        conn = db.get_db_connection()
+        cursor = conn.cursor()
+        
+        # 获取旧的图片URL（用于删除旧文件）
+        cursor.execute("SELECT image_url FROM item_images WHERE item_id=%s LIMIT 1",(item_id,))
+        old_images = cursor.fetchall()
+        
+        # 保存新图片
+        _,suffix = os.path.splitext(image.filename)
+        image_url = "/static/image/item_image/"+shared.generate_random_id() + suffix
+        image.save('.'+image_url)
+        
+        # 如果存在旧图片，更新第一条记录；否则插入新记录
+        if len(old_images) > 0:
+            old_image_url = old_images[0][0]
+            # 删除旧文件（如果存在）
+            old_file_path = '.'+old_image_url
+            if os.path.exists(old_file_path):
+                try:
+                    os.remove(old_file_path)
+                except:
+                    pass  # 如果删除失败，继续执行
+            # 更新数据库记录
+            cursor.execute("UPDATE item_images SET image_url=%s WHERE item_id=%s LIMIT 1",(image_url,item_id))
+        else:
+            # 插入新记录
+            cursor.execute("INSERT INTO item_images (item_id,image_url) VALUES (%s,%s)",(item_id,image_url))
+        
+        conn.commit()
+        return jsonify({"msg":"修改成功","image_url":image_url}),200
+    except Exception as e:
+        if conn: conn.rollback()
+        traceback.print_exc()
+        return jsonify({"errorMsg": "数据库操作失败"}), 500
+    finally:
+        if cursor: cursor.close()
+        if conn: conn.close()
+
 # 计算餐品的总价格
 def calcItemsPrice(items):
     try:
@@ -391,7 +478,7 @@ def pay_order(shop_id):
         cursor.execute("INSERT INTO alipay_trade (username,out_trade_no,total_amount,order_content,belong_shop) "
                        "VALUES (%s,%s,%s,%s,%s)",(username,out_trade_no,total_amount,order_content,shop_id))
         conn.commit()
-        return jsonify({"pay_url":pay_url}),200
+        return jsonify({"pay_url":pay_url,"out_trade_no":out_trade_no}),200
     except Exception as e:
         if conn: conn.rollback()
         traceback.print_exc()
