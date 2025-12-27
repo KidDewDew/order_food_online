@@ -223,10 +223,11 @@
 	
 	function do_post_order_testSkipPay() {
 		let isOrderEmpty = true;
+		let buy_items = {}
 		for(let item_id in item_selected_num) {
 			if(item_selected_num[item_id] != 0) {
 				isOrderEmpty = false;
-				break;
+				buy_items[item_id] = item_selected_num[item_id];
 			}
 		}
 		if(isOrderEmpty) {
@@ -249,7 +250,7 @@
 				}
 			}
 		}
-		xhr.send(JSON.stringify(item_selected_num));
+		xhr.send(JSON.stringify(buy_items));
 	}
 	
 	{%endif%}
