@@ -246,6 +246,17 @@ button:active {
 	justify-content: space-between;
 	align-items: center;
 	padding: 0 1rem;
+	position: relative;
+}
+
+.topBar::after {
+	content: '';
+	width: 100%;
+	height: 2pt;
+	position: absolute;
+	left: 0;
+	bottom: 0;
+	background: #D1BA51;
 }
 
 .topBar > .title {
@@ -266,14 +277,24 @@ button:active {
 
 .bottomBar {
 	padding: 0.5rem 0.75rem;
-	width: 100vw;
-	min-height: 50pt;
+	min-height: 40pt;
 	background: white;
 	box-shadow: 0 -2px 8px rgba(0,0,0,0.06);
 	display: flex;
 	justify-content: space-around;
 	align-items: center;
 	gap: 0.5rem;
+	position: relative;
+}
+
+.bottomBar::after {
+	content: '';
+	width: 100%;
+	height: 2pt;
+	position: absolute;
+	left: 0;
+	top: 0;
+	background: #D1BA51;
 }
 
 .greenbox_text {

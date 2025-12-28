@@ -6,6 +6,43 @@
 	<link rel="stylesheet" type="text/css" href="/static/base.css">
 	<link rel="stylesheet" type="text/css" href="/static/shop.css">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<style>
+		.overlay {   /*遮罩层*/
+			position:absolute;
+			top:0;left:0;
+			width:100%;height:100%;
+			z-index:-1;
+			opacity: 0.0;
+			transition: opacity 0.3s;
+			background: grey;
+		}
+		.overlay[show] {
+			opacity: 0.3;
+			z-index: 1000;
+		}
+		.bottom_popup {  /*底部弹窗*/
+			position: fixed;
+			bottom: -40vh;
+			left: 0;
+			width: 100%;
+			height: 40vh;
+			padding: 6pt 12pt;
+			box-sizing: border-box;
+			transition: transform 0.5s;
+			z-index: -1;
+			background: white;
+			border-top-left-radius: 20px;
+			border-top-right-radius: 20px;
+			box-shadow: 0 -3px 12px rgba(0.4,0.4,0.4,0.2);
+			visibility:hidden;
+		}
+		.bottom_popup[show] {
+			visibility:visible;
+			transform: translate(0px,-100%);
+			z-index: 1001;
+		}
+		
+	</style>
 </head>
 <body>
 	<div class="mobile_page">
@@ -33,7 +70,7 @@
 			{%else%}
 			<button class="link_button" onclick="window.location.href='/my_orders'">
 			我的订单</button>
-			<button class="accent_button" onclick="do_post_order()">我选好了</button>
+			<button class="accent_button" onclick="showConfirmOrderPopup();//do_post_order()">我选好了</button>
 			{%endif%}
 		</div>
 	</div>
@@ -98,6 +135,24 @@
 		</div>
 	</dialog>
 	
+	<div id="overlay" class="overlay" onclick="hideConfirmOrderPopup();"></div> <!--遮罩层，配合底部对话框使用-->
+	
+	<div id="confirm_order_popup" class="bottom_popup">
+		<div style="text-align:center;margin-bottom:5pt;">确认订单</div>
+		<div style="margin:4pt 2pt;border-bottom:1px solid #444;"></div>
+		<div style="height:70%;">
+			<div class="tip_text" style="float:left;font-size:0.9rem;">购买列表</div>
+			<div id="buy_list" style="float:right;width:75%;max-height:100%;overflow-y:auto;">
+				
+			</div>
+		</div>
+		<div style="clear:both;margin:2pt 2pt;border-bottom:1px solid #444;"></div>
+		<div style="margin:6pt auto; width:fit-content;">
+			<span id="sum_price">总计12.6元&nbsp;</span>
+			<button style="display:inline-block" onclick="do_post_order();hideConfirmOrderPopup();"> 付款 </button>
+		</div>
+	</div>
+	
 </body>
 
 <script>
@@ -117,6 +172,46 @@
 	var need_toAddRestNum = {};   //存储需要修改剩余数量的值
 	
 	var latest_saved_items = {};  //最近一次获取的商品列表，不允许做修改
+	
+	const popup_confirm_order = document.getElementById("confirm_order_popup");
+	const overlay = document.getElementById("overlay")
+	
+	const buy_list_ele = document.getElementById("buy_list");
+	
+	function showConfirmOrderPopup() {
+		let isOrderEmpty = true;
+		let sum_price = 0.0;
+		buy_list.innerHTML = "";
+		for(let item_id in item_selected_num) {
+			if(item_selected_num[item_id] != 0) {
+				isOrderEmpty = false;
+				const item = latest_saved_items[item_id];
+				const num = item_selected_num[item_id];
+				const ele = document.createElement("div");
+				ele.className = "item_item2";
+				ele.innerHTML = `<div style='font-size:0.8rem;white-space:nowrap;'>${item.item_name}
+									<span style='color:blue;font-size:1.0rem'>*${num}</span></div>
+								<div></div>
+								<div style='white-space:nowrap;'>${item.price * num}元</div>`;
+				buy_list_ele.appendChild(ele);
+				sum_price += num * item.price;
+			}
+		}
+		
+		document.getElementById("sum_price").innerHTML = "总计"+sum_price+"元&nbsp;";
+		
+		if(isOrderEmpty) {
+			alert("订单不能为空，再看看点什么吧！")
+			return;
+		}
+		popup_confirm_order.setAttribute("show","");
+		overlay.setAttribute("show","");
+	}
+	
+	function hideConfirmOrderPopup() {
+		popup_confirm_order.removeAttribute("show");
+		overlay.removeAttribute("show");
+	}
 	
 	function doInput(labelName,callback) {
 		inputany_label.innerHTML = labelName;
@@ -252,7 +347,7 @@
 	function showPaymentDialog(pay_url, out_trade_no) {
 		const dialog = document.createElement('dialog');
 		dialog.id = 'payment_dialog';
-		dialog.style.cssText = 'padding:2rem;border-radius:12px;border:2px solid var(--border);max-width:90vw;width:400px;';
+		dialog.style.cssText = 'padding:2rem;border-radius:12px;border:2px solid var(--border);width:75vw';
 		dialog.innerHTML = `
 			<div style="text-align:center;margin-bottom:1.5rem;">
 				<div style="font-size:1.2rem;font-weight:600;color:#6E5B1D;margin-bottom:0.5rem;">选择支付方式</div>

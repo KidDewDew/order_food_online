@@ -31,15 +31,8 @@ def shoplist_page():
     try:
         conn = db.get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute(f"SELECT shop_id,shop_name,shop_position FROM shop")
+        cursor.execute(f"SELECT shop_id,shop_name,shop_position,status FROM shop")
         shoplist = cursor.fetchall()
-        for i in range(20):
-            shoplist.append({
-                "shop_id":i,
-                "shop_name":"苏大烧烤店",
-                "shop_position":"苏州大学本部校区食堂门口",
-                "status":random.randint(0,1)
-            })
         return render_template("shoplist.html",
                                normal_status=shared.ShopStatus_Normal,reserve_status=shared.ShopStatus_Reserve,
                                shoplist=shoplist)
